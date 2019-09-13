@@ -105,12 +105,14 @@ class EfficientNet(nn.Module):
 
     """
 
-    def __init__(self, blocks_args=None, global_params=None):
+    def __init__(self, blocks_args=None, global_params=None, include_top=True, pooling='avg'):
         super().__init__()
         assert isinstance(blocks_args, list), 'blocks_args should be a list'
         assert len(blocks_args) > 0, 'block args must be greater than 0'
         self._global_params = global_params
         self._blocks_args = blocks_args
+        self.include_top = include_top
+        self.pooling = pooling
 
         # Get static or dynamic convolution depending on image size
         Conv2d = get_same_padding_conv2d(image_size=global_params.image_size)
@@ -178,6 +180,10 @@ class EfficientNet(nn.Module):
         x = self.extract_features(inputs)
 
         # Pooling and final linear layer
+        if not self.include_top:
+            if self.pooling = 'avg':
+                return F.adaptive_avg_pool2d(x, 1).squeeze(-1).squeeze(-1)
+            return x
         x = F.adaptive_avg_pool2d(x, 1).squeeze(-1).squeeze(-1)
         if self._dropout:
             x = F.dropout(x, p=self._dropout, training=self.training)
@@ -185,14 +191,16 @@ class EfficientNet(nn.Module):
         return x
 
     @classmethod
-    def from_name(cls, model_name, override_params=None):
+    def from_name(cls, model_name, override_params=None, include_top=True, pooling='avg'):
         cls._check_model_name_is_valid(model_name)
         blocks_args, global_params = get_model_params(model_name, override_params)
-        return cls(blocks_args, global_params)
+        return cls(blocks_args, global_params, include_top, pooling)
 
     @classmethod
-    def from_pretrained(cls, model_name, num_classes=1000):
+    def from_pretrained(cls, model_name, num_classes=1000, include_top=True, pooling='avg'):
         model = cls.from_name(model_name, override_params={'num_classes': num_classes})
+        model.include_top = include_top
+        model.pooling = pooling
         load_pretrained_weights(model, model_name, load_fc=(num_classes == 1000))
         return model
 
